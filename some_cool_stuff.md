@@ -1,4 +1,4 @@
-## Take FULL backup of entire DB
+## ✅ Take FULL backup of entire DB
 `pg_dump -U postgres -d bank_db > bank_db_backup.sql`
 
 - This creates a single .sql file containing the whole database.
