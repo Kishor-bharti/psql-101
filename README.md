@@ -988,6 +988,227 @@ SELECT * FROM dept_max_sal_emp('HR');
 
 Defined by an OVER() clause.
 
+- we're gonna use the employees table of bank_db
+```psql
+SELECT * FROM employees; -- normal
 
+SELECT SUM(salary) FROM employees; -- all other rows are not presented!
+
+SELECT SUM(salary) OVER() FROM employees; -- using only over() clause, will return all the rows! 
+-- here, the sum of salaries get associated with the number of rows
+
+SELECT fname, salary,  SUM(salary) OVER() FROM employees; -- better presentable! Yet not very useful!
+
+SELECT fname, salary , SUM(salary) OVER(ORDER BY salary) FROM employees; -- now, this is interesting! ✅ 
+-- it's known as Running Count, or the Running Sum!
+
+SELECT fname, salary, AVG(salary) OVER(ORDER BY salary) FROM employees; -- moving average
+
+```
+```yaml
+◆ Benefits of Window Functions
+
+● Advanced Analytics : They enable complex calculations like running totals, moving averages, rank calculations, and cumulative distributions.
+
+● Non-Aggregating: Unlike aggregate functions, window functions do not collapse rows. This means you can calculate aggregates while retaining individual row details.
+
+● Flexibitily : They can be used in various clauses of SQL, such as SELECT, ORDER BY, and HAVING, providing a lot of flexibility in writing queries.\
+
+◆ Some more examples of Window Functions (or how we used the SUM())
+
+● ROW_NUMBER()
+● RANK()
+● DENSE_RANK()
+● LAG()
+● LEAD()
+```
+
+```psql
+
+-- ● ROW_NUMBER()
+
+-- ✅ for row numbers
+SELECT 
+        ROW_NUMBER() OVER(), 
+        fname, salary
+        FROM employees;
+
+-- ✅ now with dept
+SELECT 
+        ROW_NUMBER() OVER(ORDER BY fname), -- now the row number will be on the basis of fname!
+        fname, dept, salary
+        FROM employees;
+
+-- ✅ We can also use PARTITION BY (like GROUP BY) in OVER() 
+SELECT 
+        ROW_NUMBER() OVER(PARTITION BY dept),  -- very interesting...
+        fname, dept, salary
+        FROM employees;
+
+
+-- ● RANK()
+
+SELECT 
+        fname, salary, 
+        RANK() OVER(ORDER BY salary DESC) -- again, very interesting! but here's a problem! It couldn't give anyone RANK 2! If we want to RANK students based on marks obtained and not Number of Students, we use DENSE_RANK()
+        FROM employees;
+
+-- ● DENSE_RANK()
+
+SELECT
+        fname, salary,
+        DENSE_RANK() OVER(ORDER BY salary DESC)
+        FROM employees;
+
+-- ● LAG() |  LEAD()
+
+SELECT                              -- see the difference using Lag() and Lead() in this query!
+        fname, salary,
+        LAG(salary) OVER()
+        FROM employees; 
+
+-- ✅ Now, if we want to see it's usage: 
+
+SELECT
+        fname, salary,
+        LEAD(salary) OVER(ORDER BY salary)
+        FROM employees;
+
+
+-- wow! the best case usecase! ✅
+SELECT
+        fname, salary,
+        (salary - LEAD(salary) OVER(ORDER BY salary)) AS salary_diff
+        FROM employees;
+
+```
+
+## Understanding CTE
+
+◆ Definition : CTE (Common Table Expression) is a temporary result set that you can define within a query to simplify complex SQL statements.
+
+![cte](https://github.com/Kishor-bharti/MD-Resources/blob/main/CTE.png?raw=true)
+
+![learn_cte](https://github.com/Kishor-bharti/MD-Resources/blob/main/cte_example.png?raw=true)
+
+```yaml
+
+◆ Use Cases - 1
+
+● We want to calculate the average salary per department and then find all employees whose salary is above the average salary of their department.
+
+```
+
+![end result](https://github.com/Kishor-bharti/MD-Resources/blob/main/end_result_cte_example.png?raw=true)
+
+```psql
+◈ Query : 
+
+SELECT dept, AVG(salary)
+            FROM employees
+            GROUP BY dept;
+
+Now, with CTE
+
+WITH avg_sal AS (
+SELECT dept, AVG(salary) AS avg_salary FROM employees GROUP BY dept
+)
+
+SELECT
+        e.emp_id, e.fname, e.dept, e.salary, a.avg_salary
+FROM employees e
+JOIN
+        avg_sal a ON e.dept=a.dept
+WHERE 
+        e.salary > a.avg_salary;
+
+
+```
+
+
+```yaml
+
+◈ Use Cases - 2
+
+● We want to find the highest-paid employee in each department.
+
+```
+
+```psql
+
+WITH max_sal AS (
+SELECT dept, MAX(salary) AS max_salary FROM employees GROUP BY dept
+)
+
+SELECT
+        e.emp_id, e.fname, e.dept, e.salary
+FROM 
+        employees e
+JOIN
+        max_sal m ON e.dept=m.dept
+WHERE
+        e.salary = m.max_salary;
+
+```
+
+- Points :
+● Once CTE has been created it can only be used once. It will not be persisted.
+
+
+## What are Triggers 
+
+◈ Definition : Triggers are special procedures in a database that automatically execute predefined actions in response to certain events on a specified table or view.
+
+◇ Syntax : 
+![syntax](https://github.com/Kishor-bharti/MD-Resources/blob/main/triggers_syntax.png?raw=true)
+
+◇ Functions for triggers : 
+![functions for triggers](https://github.com/Kishor-bharti/MD-Resources/blob/main/functions_for_triggers.png?raw=true)
+
+```yaml
+
+◇ Use Case : 
+Create a Trigger so that 
+If we insert/ update negative salary in a table,
+it will be triggered and set it to 0.
+
+```
+
+```psql
+
+-- for this also, we'll use the employees table 
+
+SELECT * FROM employees;
+
+CALL update_emp_salary(1, -52000);  -- by mistake, we updated it with a negative value!
+
+-- now with Triggers ✅
+
+CREATE OR REPLACE FUNCTION check_salary()
+RETURNS TRIGGER AS $$
+BEGIN
+        IF NEW.salary < 0 THEN
+            NEW.salary = 0;
+        END IF;
+        RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER before_update_salary
+BEFORE UPDATE ON employees
+FOR EACH ROW
+EXECUTE FUNCTION check_salary();
+
+\dS employees                   -- to check the triggers
+\df+                                     -- to check all of the triggers
+
+-- now if we update someone's salary with a negative value, the trigger will automatically gets triggered and set this value to 0 ✅ 
+
+CALL update_emp_salary(2, -52000); 
+
+SELECT * FROM employees;
+
+```
+#### COMPLETED ON 11 feb 2026 @05:40
 
 
